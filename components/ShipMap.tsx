@@ -724,7 +724,14 @@ export default function ShipMap() {
     try {
       const response = await fetch('/api/ais-ingest?demo=off', { cache: 'no-store' })
       if (!response.ok) {
-        setReconnectNote('Reconnect failed. Check AISSTREAM_API_KEY and server logs.')
+        let detail = ''
+        try {
+          const payload = (await response.json()) as { error?: string }
+          detail = payload.error ? ` ${payload.error}` : ''
+        } catch {
+          // Keep generic fallback when response body is not JSON.
+        }
+        setReconnectNote(`Reconnect failed (${response.status}).${detail}`.trim())
         return
       }
 
