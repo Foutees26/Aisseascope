@@ -428,12 +428,30 @@ export default function ShipMap() {
 
       let unique: Vessel[] = []
       if (data) {
-        const seen = new Set<string>()
-        unique = data.filter((v: Vessel) => {
-          if (seen.has(v.mmsi)) return false
-          seen.add(v.mmsi)
-          return true
-        })
+        const byMmsi = new Map<string, Vessel>()
+
+        for (const vessel of data) {
+          const existing = byMmsi.get(vessel.mmsi)
+          if (!existing) {
+            byMmsi.set(vessel.mmsi, vessel)
+            continue
+          }
+
+          // Keep the newest position row, but enrich missing identity fields from older rows.
+          byMmsi.set(vessel.mmsi, {
+            ...existing,
+            vessel_name: existing.vessel_name ?? vessel.vessel_name,
+            ship_type: existing.ship_type ?? vessel.ship_type,
+            destination: existing.destination ?? vessel.destination,
+            eta: existing.eta ?? vessel.eta,
+            draught: existing.draught ?? vessel.draught,
+            flag: existing.flag ?? vessel.flag,
+            length: existing.length ?? vessel.length,
+            width: existing.width ?? vessel.width,
+          })
+        }
+
+        unique = Array.from(byMmsi.values())
 
         unique = unique.slice(0, MAX_MAP_VESSELS)
       }
