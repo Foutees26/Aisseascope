@@ -342,22 +342,32 @@ export default function ShipMap() {
         minLng: -11,
         maxLng: -5,
       }
+      const NORTHWEST_IRELAND_BOUNDS = {
+        minLat: 54.6,
+        maxLat: 56.8,
+        minLng: -11.8,
+        maxLng: -8,
+      }
+      const NORTHWEST_PRIORITY_LIMIT = 450
+      const IRELAND_PRIORITY_LIMIT = 550
+      const GLOBAL_BACKFILL_LIMIT = 500
+      const MAX_MAP_VESSELS = 900
 
       const fetchSlice = async ({
         limit,
-        irelandOnly,
+        bounds,
       }: {
         limit: number
-        irelandOnly: boolean
+        bounds: typeof IRELAND_BOUNDS | null
       }): Promise<Vessel[] | null> => {
-        const full = irelandOnly
+        const full = bounds
           ? await supabase
               .from('vessel_positions')
               .select(OPTIONAL_SELECT)
-              .gte('latitude', IRELAND_BOUNDS.minLat)
-              .lte('latitude', IRELAND_BOUNDS.maxLat)
-              .gte('longitude', IRELAND_BOUNDS.minLng)
-              .lte('longitude', IRELAND_BOUNDS.maxLng)
+              .gte('latitude', bounds.minLat)
+              .lte('latitude', bounds.maxLat)
+              .gte('longitude', bounds.minLng)
+              .lte('longitude', bounds.maxLng)
               .order('timestamp', { ascending: false })
               .limit(limit)
           : await supabase
@@ -367,14 +377,14 @@ export default function ShipMap() {
               .limit(limit)
 
         if (full.error && /column .* does not exist/i.test(full.error.message)) {
-          const fallback = irelandOnly
+          const fallback = bounds
             ? await supabase
                 .from('vessel_positions')
                 .select(CORE_SELECT)
-                .gte('latitude', IRELAND_BOUNDS.minLat)
-                .lte('latitude', IRELAND_BOUNDS.maxLat)
-                .gte('longitude', IRELAND_BOUNDS.minLng)
-                .lte('longitude', IRELAND_BOUNDS.maxLng)
+                .gte('latitude', bounds.minLat)
+                .lte('latitude', bounds.maxLat)
+                .gte('longitude', bounds.minLng)
+                .lte('longitude', bounds.maxLng)
                 .order('timestamp', { ascending: false })
                 .limit(limit)
             : await supabase
@@ -400,16 +410,17 @@ export default function ShipMap() {
       let data: Vessel[] | null = null
 
       try {
-        const [irelandRows, globalRows] = await Promise.all([
-          fetchSlice({ limit: 450, irelandOnly: true }),
-          fetchSlice({ limit: 550, irelandOnly: false }),
+        const [northwestRows, irelandRows, globalRows] = await Promise.all([
+          fetchSlice({ limit: NORTHWEST_PRIORITY_LIMIT, bounds: NORTHWEST_IRELAND_BOUNDS }),
+          fetchSlice({ limit: IRELAND_PRIORITY_LIMIT, bounds: IRELAND_BOUNDS }),
+          fetchSlice({ limit: GLOBAL_BACKFILL_LIMIT, bounds: null }),
         ])
 
-        if (!irelandRows && !globalRows) {
+        if (!northwestRows && !irelandRows && !globalRows) {
           return
         }
 
-        data = [...(irelandRows ?? []), ...(globalRows ?? [])]
+        data = [...(northwestRows ?? []), ...(irelandRows ?? []), ...(globalRows ?? [])]
       } catch {
         // Keep existing markers on transient client/network errors instead of blanking the map.
         return
@@ -424,7 +435,7 @@ export default function ShipMap() {
           return true
         })
 
-        unique = unique.slice(0, 700)
+        unique = unique.slice(0, MAX_MAP_VESSELS)
       }
 
       const queryLooksLikeMmsi = /^\d{7,10}$/.test(vesselQuery)
