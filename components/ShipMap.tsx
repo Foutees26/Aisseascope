@@ -288,11 +288,11 @@ export default function ShipMap() {
       let unique: Vessel[] = []
       if (data) {
         const seen = new Set<string>()
-        unique = data.filter((v) => {
+        unique = (data as Vessel[]).filter((v: Vessel) => {
           if (seen.has(v.mmsi)) return false
           seen.add(v.mmsi)
           return true
-        }) as Vessel[]
+        })
       }
 
       const queryLooksLikeMmsi = /^\d{7,10}$/.test(vesselQuery)
