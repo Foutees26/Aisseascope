@@ -6,15 +6,22 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "ais:worker": "node scripts/aisstream-worker.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.103.0",
+    "dotenv": "^17.4.1",
+    "leaflet": "^1.9.4",
     "next": "16.2.3",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "react-leaflet": "^5.0.0",
+    "ws": "^8.20.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/leaflet": "^1.9.21",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
