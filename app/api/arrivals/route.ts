@@ -98,11 +98,29 @@ export async function GET(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-  const { data, error } = await supabase
+  let data: unknown[] | null = null
+  let error: { message: string } | null = null
+
+  const fullSelect = await supabase
     .from('vessel_positions')
     .select('mmsi, vessel_name, latitude, longitude, speed_over_ground, course_over_ground, destination, draught, length, width, timestamp')
     .order('timestamp', { ascending: false })
     .limit(5000)
+
+  data = (fullSelect.data as unknown[] | null) ?? null
+  error = fullSelect.error ? { message: fullSelect.error.message } : null
+
+  // Some deployments may not have optional vessel dimension columns yet.
+  if (error && /column .* does not exist/i.test(error.message)) {
+    const fallback = await supabase
+      .from('vessel_positions')
+      .select('mmsi, vessel_name, latitude, longitude, speed_over_ground, course_over_ground, destination, timestamp')
+      .order('timestamp', { ascending: false })
+      .limit(5000)
+
+    data = (fallback.data as unknown[] | null) ?? null
+    error = fallback.error ? { message: fallback.error.message } : null
+  }
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
