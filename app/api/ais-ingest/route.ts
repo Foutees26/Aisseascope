@@ -1,10 +1,10 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import WS from 'ws'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-let supabaseClient: any = null
+let supabaseClient: SupabaseClient | null = null
 
 function getSupabaseClient() {
   if (supabaseClient) {

@@ -1,6 +1,6 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-let supabaseClient: any = null
+let supabaseClient: SupabaseClient | null = null
 
 export function getSupabaseClient() {
   if (supabaseClient) {
@@ -19,7 +19,7 @@ export function getSupabaseClient() {
 }
 
 export const supabase = new Proxy(
-  {},
+  {} as SupabaseClient,
   {
     get(_target, prop) {
       const client = getSupabaseClient()
@@ -27,8 +27,8 @@ export const supabase = new Proxy(
         throw new Error('Supabase client is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.')
       }
 
-      const value = client[prop]
+      const value = (client as unknown as Record<PropertyKey, unknown>)[prop]
       return typeof value === 'function' ? value.bind(client) : value
     },
   }
-) as any
+) as SupabaseClient
