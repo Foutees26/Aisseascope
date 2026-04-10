@@ -297,32 +297,82 @@ export default function ShipMap() {
 
   useEffect(() => {
     const fetchVessels = async () => {
+      const OPTIONAL_SELECT = 'mmsi, vessel_name, latitude, longitude, speed_over_ground, course_over_ground, true_heading, nav_status, ship_type, destination, timestamp, eta, draught, flag, length, width'
+      const CORE_SELECT = 'mmsi, vessel_name, latitude, longitude, speed_over_ground, course_over_ground, true_heading, nav_status, ship_type, destination, timestamp'
+      const IRELAND_BOUNDS = {
+        minLat: 51,
+        maxLat: 56.8,
+        minLng: -11,
+        maxLng: -5,
+      }
+
+      const fetchSlice = async ({
+        limit,
+        irelandOnly,
+      }: {
+        limit: number
+        irelandOnly: boolean
+      }): Promise<Vessel[] | null> => {
+        const full = irelandOnly
+          ? await supabase
+              .from('vessel_positions')
+              .select(OPTIONAL_SELECT)
+              .gte('latitude', IRELAND_BOUNDS.minLat)
+              .lte('latitude', IRELAND_BOUNDS.maxLat)
+              .gte('longitude', IRELAND_BOUNDS.minLng)
+              .lte('longitude', IRELAND_BOUNDS.maxLng)
+              .order('timestamp', { ascending: false })
+              .limit(limit)
+          : await supabase
+              .from('vessel_positions')
+              .select(OPTIONAL_SELECT)
+              .order('timestamp', { ascending: false })
+              .limit(limit)
+
+        if (full.error && /column .* does not exist/i.test(full.error.message)) {
+          const fallback = irelandOnly
+            ? await supabase
+                .from('vessel_positions')
+                .select(CORE_SELECT)
+                .gte('latitude', IRELAND_BOUNDS.minLat)
+                .lte('latitude', IRELAND_BOUNDS.maxLat)
+                .gte('longitude', IRELAND_BOUNDS.minLng)
+                .lte('longitude', IRELAND_BOUNDS.maxLng)
+                .order('timestamp', { ascending: false })
+                .limit(limit)
+            : await supabase
+                .from('vessel_positions')
+                .select(CORE_SELECT)
+                .order('timestamp', { ascending: false })
+                .limit(limit)
+
+          if (fallback.error) {
+            return null
+          }
+
+          return (fallback.data as Vessel[] | null) ?? null
+        }
+
+        if (full.error) {
+          return null
+        }
+
+        return (full.data as Vessel[] | null) ?? null
+      }
+
       let data: Vessel[] | null = null
 
       try {
-        const full = await supabase
-          .from('vessel_positions')
-          .select('mmsi, vessel_name, latitude, longitude, speed_over_ground, course_over_ground, true_heading, nav_status, ship_type, destination, timestamp, eta, draught, flag, length, width')
-          .order('timestamp', { ascending: false })
-          .limit(700)
+        const [irelandRows, globalRows] = await Promise.all([
+          fetchSlice({ limit: 450, irelandOnly: true }),
+          fetchSlice({ limit: 550, irelandOnly: false }),
+        ])
 
-        if (full.error && /column .* does not exist/i.test(full.error.message)) {
-          const fallback = await supabase
-            .from('vessel_positions')
-            .select('mmsi, vessel_name, latitude, longitude, speed_over_ground, course_over_ground, true_heading, nav_status, ship_type, destination, timestamp')
-            .order('timestamp', { ascending: false })
-            .limit(700)
-
-          if (fallback.error) {
-            return
-          }
-
-          data = (fallback.data as Vessel[] | null) ?? null
-        } else if (!full.error) {
-          data = (full.data as Vessel[] | null) ?? null
-        } else {
+        if (!irelandRows && !globalRows) {
           return
         }
+
+        data = [...(irelandRows ?? []), ...(globalRows ?? [])]
       } catch {
         // Keep existing markers on transient client/network errors instead of blanking the map.
         return
@@ -336,6 +386,8 @@ export default function ShipMap() {
           seen.add(v.mmsi)
           return true
         })
+
+        unique = unique.slice(0, 700)
       }
 
       const queryLooksLikeMmsi = /^\d{7,10}$/.test(vesselQuery)
