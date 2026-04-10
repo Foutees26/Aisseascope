@@ -158,9 +158,19 @@ export default function ShipMap() {
   const [showLocationPanel, setShowLocationPanel] = useState(false)
   const [portDepthInput, setPortDepthInput] = useState('')
   const [vesselDraughtInput, setVesselDraughtInput] = useState('')
+  const [clockMs, setClockMs] = useState(0)
   const wasMobileRef = useRef<boolean | null>(null)
 
   const vesselQuery = (searchParams.get('q') ?? '').trim().toLowerCase()
+
+  useEffect(() => {
+    const initialTick = setTimeout(() => setClockMs(Date.now()), 0)
+    const interval = setInterval(() => setClockMs(Date.now()), 30000)
+    return () => {
+      clearTimeout(initialTick)
+      clearInterval(interval)
+    }
+  }, [])
 
   useEffect(() => {
     const onResize = () => {
@@ -253,11 +263,36 @@ export default function ShipMap() {
     // Keep selected vessel visible even if live updates temporarily move it outside active filters.
     return [selectedFromAll, ...baseMapVessels]
   }, [baseMapVessels, selectedMmsi, vessels])
-  const hasLiveMessages = (ingestStatus?.received ?? 0) > 0 && !ingestStatus?.demoMode
-  const sourceBadgeLabel = ingestStatus?.demoMode ? 'Demo Feed' : hasLiveMessages ? 'Live AIS' : 'Connecting'
+  const freshestPositionMs = useMemo(() => {
+    let latest: number | null = null
+
+    for (const vessel of vessels) {
+      const value = Date.parse(vessel.timestamp)
+      if (Number.isNaN(value)) {
+        continue
+      }
+
+      if (latest === null || value > latest) {
+        latest = value
+      }
+    }
+
+    return latest
+  }, [vessels])
+
+  const hasFreshFeed = useMemo(() => {
+    if (freshestPositionMs === null || clockMs === 0) {
+      return false
+    }
+
+    const ageSeconds = (clockMs - freshestPositionMs) / 1000
+    return ageSeconds <= 180
+  }, [clockMs, freshestPositionMs])
+
+  const sourceBadgeLabel = ingestStatus?.demoMode ? 'Demo Feed' : hasFreshFeed ? 'Live AIS' : 'Delayed'
   const sourceBadgeClassName = ingestStatus?.demoMode
     ? 'border-amber-300 bg-amber-100 text-amber-900'
-    : hasLiveMessages
+    : hasFreshFeed
       ? 'border-emerald-300 bg-emerald-100 text-emerald-900'
       : 'border-slate-300 bg-slate-100 text-slate-800'
 
