@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { FormEvent, useRef, useState } from 'react'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { FormEvent, useEffect, useRef, useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
 
 function menuClass(isActive: boolean) {
   return isActive
@@ -13,12 +13,21 @@ function menuClass(isActive: boolean) {
 export default function TopNav() {
   const router = useRouter()
   const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const currentQuery = searchParams.get('q') ?? ''
-  const [query, setQuery] = useState(currentQuery)
+  const [currentQuery, setCurrentQuery] = useState('')
+  const [query, setQuery] = useState('')
   const [suggestions, setSuggestions] = useState<Array<{ mmsi: string; vessel_name: string | null }>>([])
   const [isFocused, setIsFocused] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const next = new URLSearchParams(window.location.search).get('q') ?? ''
+    setCurrentQuery(next)
+    setQuery(next)
+  }, [pathname])
 
   const navigateToSearch = (value: string) => {
     const trimmed = value.trim()

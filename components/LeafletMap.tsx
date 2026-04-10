@@ -135,7 +135,8 @@ function getVesselColor(vessel: Vessel): string {
   if (status === 'underway') return '#22c55e'
   if (status === 'anchored') return '#f59e0b'
   if (status === 'moored') return '#0ea5e9'
-  if (status === 'aground') return '#ef4444'
+  if (status === 'fishing') return '#8b5cf6'
+  if (status === 'not_under_command') return '#ef4444'
   return '#94a3b8'
 }
 

@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import ShipMap from '@/components/ShipMap'
 import TopNav from '@/components/TopNav'
 
@@ -7,7 +8,9 @@ export default function Home() {
       <TopNav />
 
       <section className="min-h-0 flex-1">
-        <ShipMap />
+        <Suspense fallback={<div className="h-full w-full bg-slate-950" />}>
+          <ShipMap />
+        </Suspense>
       </section>
     </main>
   )

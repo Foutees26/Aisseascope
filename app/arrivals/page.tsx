@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import TopNav from '@/components/TopNav'
 
 type Arrival = {
@@ -97,7 +97,9 @@ export default function ArrivalsPage() {
 
   return (
     <main className="flex min-h-screen flex-col bg-slate-950 text-white">
-      <TopNav />
+      <Suspense fallback={<div className="h-14 border-b border-slate-800 bg-slate-900" />}>
+        <TopNav />
+      </Suspense>
 
       <section className="mx-auto w-full max-w-6xl p-6">
         <h1 className="text-2xl font-bold">Projected Arrivals (Next 7 Days)</h1>
