@@ -234,7 +234,25 @@ export default function ShipMap() {
   }, [alertsOnly, shipTypeFilter, speedMax, speedMin, vesselQuery, vessels])
 
   const noQueryMatch = vesselQuery.length > 0 && filteredVessels.length === 0
-  const mapVessels = noQueryMatch ? vessels : filteredVessels
+  const baseMapVessels = noQueryMatch ? vessels : filteredVessels
+  const mapVessels = useMemo(() => {
+    if (!selectedMmsi) {
+      return baseMapVessels
+    }
+
+    const alreadyVisible = baseMapVessels.some((v) => v.mmsi === selectedMmsi)
+    if (alreadyVisible) {
+      return baseMapVessels
+    }
+
+    const selectedFromAll = vessels.find((v) => v.mmsi === selectedMmsi)
+    if (!selectedFromAll) {
+      return baseMapVessels
+    }
+
+    // Keep selected vessel visible even if live updates temporarily move it outside active filters.
+    return [selectedFromAll, ...baseMapVessels]
+  }, [baseMapVessels, selectedMmsi, vessels])
   const hasLiveMessages = (ingestStatus?.received ?? 0) > 0 && !ingestStatus?.demoMode
   const sourceBadgeLabel = ingestStatus?.demoMode ? 'Demo Feed' : hasLiveMessages ? 'Live AIS' : 'Connecting'
   const sourceBadgeClassName = ingestStatus?.demoMode
@@ -279,16 +297,41 @@ export default function ShipMap() {
 
   useEffect(() => {
     const fetchVessels = async () => {
-      const { data } = await supabase
-        .from('vessel_positions')
-        .select('*')
-        .order('timestamp', { ascending: false })
-        .limit(1000)
+      let data: Vessel[] | null = null
+
+      try {
+        const full = await supabase
+          .from('vessel_positions')
+          .select('mmsi, vessel_name, latitude, longitude, speed_over_ground, course_over_ground, true_heading, nav_status, ship_type, destination, timestamp, eta, draught, flag, length, width')
+          .order('timestamp', { ascending: false })
+          .limit(700)
+
+        if (full.error && /column .* does not exist/i.test(full.error.message)) {
+          const fallback = await supabase
+            .from('vessel_positions')
+            .select('mmsi, vessel_name, latitude, longitude, speed_over_ground, course_over_ground, true_heading, nav_status, ship_type, destination, timestamp')
+            .order('timestamp', { ascending: false })
+            .limit(700)
+
+          if (fallback.error) {
+            return
+          }
+
+          data = (fallback.data as Vessel[] | null) ?? null
+        } else if (!full.error) {
+          data = (full.data as Vessel[] | null) ?? null
+        } else {
+          return
+        }
+      } catch {
+        // Keep existing markers on transient client/network errors instead of blanking the map.
+        return
+      }
 
       let unique: Vessel[] = []
       if (data) {
         const seen = new Set<string>()
-        unique = (data as Vessel[]).filter((v: Vessel) => {
+        unique = data.filter((v: Vessel) => {
           if (seen.has(v.mmsi)) return false
           seen.add(v.mmsi)
           return true
