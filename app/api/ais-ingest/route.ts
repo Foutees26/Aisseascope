@@ -333,8 +333,25 @@ function startIngest() {
 }
 
 export async function GET(req: Request) {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || !process.env.AISSTREAM_API_KEY) {
-    return Response.json({ error: 'Missing environment variables for Supabase or AISStream.' }, { status: 500 })
+  const missingEnv: string[] = []
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    missingEnv.push('NEXT_PUBLIC_SUPABASE_URL')
+  }
+  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    missingEnv.push('NEXT_PUBLIC_SUPABASE_ANON_KEY')
+  }
+  if (!process.env.AISSTREAM_API_KEY) {
+    missingEnv.push('AISSTREAM_API_KEY')
+  }
+
+  if (missingEnv.length > 0) {
+    return Response.json(
+      {
+        error: 'Missing environment variables for Supabase or AISStream.',
+        missing: missingEnv,
+      },
+      { status: 500 }
+    )
   }
 
   const url = new URL(req.url)
