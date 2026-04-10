@@ -159,6 +159,8 @@ export default function ShipMap() {
   const [portDepthInput, setPortDepthInput] = useState('')
   const [vesselDraughtInput, setVesselDraughtInput] = useState('')
   const [clockMs, setClockMs] = useState(0)
+  const [reconnectPending, setReconnectPending] = useState(false)
+  const [reconnectNote, setReconnectNote] = useState<string | null>(null)
   const wasMobileRef = useRef<boolean | null>(null)
 
   const vesselQuery = (searchParams.get('q') ?? '').trim().toLowerCase()
@@ -711,6 +713,36 @@ export default function ShipMap() {
     setShowLocationPanel(true)
   }
 
+  const handleReconnectLive = async () => {
+    if (reconnectPending) {
+      return
+    }
+
+    setReconnectPending(true)
+    setReconnectNote(null)
+
+    try {
+      const response = await fetch('/api/ais-ingest?demo=off', { cache: 'no-store' })
+      if (!response.ok) {
+        setReconnectNote('Reconnect failed. Check AISSTREAM_API_KEY and server logs.')
+        return
+      }
+
+      const data = (await response.json()) as IngestDebugStatus
+      setIngestStatus(data)
+
+      if (data.demoMode) {
+        setReconnectNote('Demo feed still active. Try again in a few seconds.')
+      } else {
+        setReconnectNote('Reconnect requested. Waiting for fresh AIS messages...')
+      }
+    } catch {
+      setReconnectNote('Reconnect request failed due to a network error.')
+    } finally {
+      setReconnectPending(false)
+    }
+  }
+
   return (
     <div className="relative h-full w-full">
       <div className="pointer-events-none absolute left-1/2 top-2 z-[1000] -translate-x-1/2 md:top-4">
@@ -1005,6 +1037,15 @@ export default function ShipMap() {
         <p>Rows inserted: {ingestStatus?.inserted ?? 0}</p>
         <p>Demo mode: {ingestStatus?.demoMode ? 'on' : 'off'}</p>
         <p>Demo fleet: {ingestStatus?.demoCount ?? 0}</p>
+        <button
+          type="button"
+          onClick={() => void handleReconnectLive()}
+          disabled={reconnectPending}
+          className="mt-2 w-full rounded bg-cyan-700 px-2 py-1 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+        >
+          {reconnectPending ? 'Requesting...' : 'Reconnect Live AIS'}
+        </button>
+        {reconnectNote && <p className="mt-1 text-xs text-slate-700">{reconnectNote}</p>}
         <p className="break-words text-red-700">Last error: {ingestStatus?.lastError ?? 'none'}</p>
       </div>
       )}
