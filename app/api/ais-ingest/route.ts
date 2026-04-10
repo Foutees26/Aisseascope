@@ -4,10 +4,22 @@ import WS from 'ws'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+let supabaseClient: any = null
+
+function getSupabaseClient() {
+  if (supabaseClient) {
+    return supabaseClient
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return null
+  }
+
+  supabaseClient = createClient(supabaseUrl, supabaseAnonKey)
+  return supabaseClient
+}
 
 type DemoVessel = {
   mmsi: string
@@ -137,6 +149,12 @@ function advanceDemoFleet() {
 }
 
 async function insertDemoFleet() {
+  const supabase = getSupabaseClient()
+  if (!supabase) {
+    ingestState.lastError = 'Missing Supabase environment variables.'
+    return
+  }
+
   const rows = ingestState.demoVessels.map((vessel) => ({
     mmsi: vessel.mmsi,
     vessel_name: vessel.vessel_name,
@@ -244,6 +262,12 @@ function startIngest() {
       const longitude = meta.longitude ?? meta.Longitude ?? pos.Longitude ?? null
 
       if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+        return
+      }
+
+      const supabase = getSupabaseClient()
+      if (!supabase) {
+        ingestState.lastError = 'Missing Supabase environment variables.'
         return
       }
 

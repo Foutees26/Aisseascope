@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
 type VesselRow = {
   mmsi: string
   vessel_name: string | null
@@ -19,6 +14,14 @@ export async function GET(req: NextRequest) {
   if (!q) {
     return NextResponse.json({ suggestions: [] })
   }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return NextResponse.json({ error: 'Missing Supabase environment variables.' }, { status: 500 })
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
   const { data, error } = await supabase
     .from('vessel_positions')
